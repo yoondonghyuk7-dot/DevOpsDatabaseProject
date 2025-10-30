@@ -17,7 +17,8 @@ export default function JobManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [formData, setFormData] = useState({
-    sector_id: '',
+    from_sector_id: '',
+    to_sector_id: '',
     date: '2024-01-15',
     demand_kg: 0,
     tw_start: '09:00',
@@ -34,7 +35,8 @@ export default function JobManagement() {
     } else {
       setEditingIndex(null);
       setFormData({
-        sector_id: '',
+        from_sector_id: '',
+        to_sector_id: '',
         date: '2024-01-15',
         demand_kg: 0,
         tw_start: '09:00',
@@ -48,11 +50,18 @@ export default function JobManagement() {
   };
 
   const handleSubmit = () => {
-    const sector = sectors.find(s => s.id === formData.sector_id);
+    // 요구사항: 출발섹터/도착섹터 UI 추가. 데이터 모델은 기존 유지(단일 sector_id)
+    // 저장 시 도착섹터를 대표 섹터로 사용
+    const sector = sectors.find(s => s.id === formData.to_sector_id) || sectors.find(s => s.id === formData.from_sector_id);
     const completeJob = {
-      ...formData,
-      lat: sector?.lat || formData.lat,
-      lon: sector?.lon || formData.lon
+      sector_id: formData.to_sector_id || formData.from_sector_id,
+      date: formData.date,
+      demand_kg: formData.demand_kg,
+      tw_start: formData.tw_start,
+      tw_end: formData.tw_end,
+      priority: 2,
+      lat: sector?.lat || 0,
+      lon: sector?.lon || 0
     } as Job;
 
     if (editingIndex !== null) {
@@ -125,23 +134,43 @@ export default function JobManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div>
-                  <Label>섹터</Label>
-                  <Select
-                    value={formData.sector_id}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, sector_id: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="섹터 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sectors.map((sector) => (
-                        <SelectItem key={sector.id} value={sector.id}>
-                          {sector.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>출발 섹터</Label>
+                    <Select
+                      value={formData.from_sector_id}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, from_sector_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="출발 섹터 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sectors.map((sector) => (
+                          <SelectItem key={sector.id} value={sector.id}>
+                            {sector.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>도착 섹터</Label>
+                    <Select
+                      value={formData.to_sector_id}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, to_sector_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="도착 섹터 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sectors.map((sector) => (
+                          <SelectItem key={sector.id} value={sector.id}>
+                            {sector.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 
                 <div>
@@ -186,22 +215,7 @@ export default function JobManagement() {
                   </div>
                 </div>
                 
-                <div>
-                  <Label>우선순위</Label>
-                  <Select
-                    value={String(formData.priority)}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, priority: parseInt(value) }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">높음 (1)</SelectItem>
-                      <SelectItem value="2">보통 (2)</SelectItem>
-                      <SelectItem value="3">낮음 (3)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* 우선순위 필드 제거 */}
                 
                 <Button onClick={handleSubmit} className="w-full">
                   {editingIndex !== null ? '수정' : '등록'}
@@ -217,26 +231,35 @@ export default function JobManagement() {
           <TableHeader>
             <TableRow>
               <TableHead>날짜</TableHead>
-              <TableHead>섹터</TableHead>
+              <TableHead>출발 섹터</TableHead>
+              <TableHead>도착 섹터</TableHead>
               <TableHead>수요량</TableHead>
               <TableHead>시간창</TableHead>
-              <TableHead>우선순위</TableHead>
               <TableHead>작업</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {jobs.map((job, index) => {
-              const sector = sectors.find(s => s.id === job.sector_id);
+              const fromSector = sectors.find(s => s.id === (job as any).from_sector_id);
+              const toSector = sectors.find(s => s.id === job.sector_id);
               return (
                 <TableRow key={index}>
                   <TableCell>{job.date}</TableCell>
                   <TableCell>
+                    {(job as any).from_sector_id ? (
+                      <div>
+                        <Badge variant="outline">{(job as any).from_sector_id}</Badge>
+                        {fromSector && (
+                          <div className="text-xs text-muted-foreground mt-1">{fromSector.name}</div>
+                        )}
+                      </div>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
                     <div>
                       <Badge variant="outline">{job.sector_id}</Badge>
-                      {sector && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {sector.name}
-                        </div>
+                      {toSector && (
+                        <div className="text-xs text-muted-foreground mt-1">{toSector.name}</div>
                       )}
                     </div>
                   </TableCell>
@@ -246,18 +269,6 @@ export default function JobManagement() {
                       <Clock className="w-3 h-3" />
                       {job.tw_start} ~ {job.tw_end}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="secondary"
-                      className={
-                        job.priority === 1 ? 'bg-red-100 text-red-800' :
-                        job.priority === 2 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }
-                    >
-                      {job.priority === 1 ? '높음' : job.priority === 2 ? '보통' : '낮음'}
-                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

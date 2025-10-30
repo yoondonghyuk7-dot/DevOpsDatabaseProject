@@ -125,39 +125,7 @@ export default function SectorManagement() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="tw-start">시작 시간</Label>
-                  <Input
-                    id="tw-start"
-                    type="time"
-                    value={formData.tw_start}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tw_start: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="tw-end">종료 시간</Label>
-                  <Input
-                    id="tw-end"
-                    type="time"
-                    value={formData.tw_end}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tw_end: e.target.value }))}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="priority">우선순위</Label>
-                <Input
-                  id="priority"
-                  type="number"
-                  min="1"
-                  max="5"
-                  value={formData.priority}
-                  onChange={(e) => setFormData(prev => ({ ...prev, priority: parseInt(e.target.value) || 2 }))}
-                />
-              </div>
+              {/* 시간창 및 우선순위 필드는 요구사항에 따라 제거 */}
               
               <Button onClick={handleSubmit} className="w-full">
                 {editingSector ? '수정' : '등록'}
@@ -174,8 +142,7 @@ export default function SectorManagement() {
               <TableHead>섹터 ID</TableHead>
               <TableHead>이름</TableHead>
               <TableHead>좌표</TableHead>
-              <TableHead>시간창</TableHead>
-              <TableHead>우선순위</TableHead>
+              {/* 시간창/우선순위 컬럼 제거 */}
               <TableHead>작업</TableHead>
             </TableRow>
           </TableHeader>
@@ -189,24 +156,7 @@ export default function SectorManagement() {
                 <TableCell className="font-mono text-sm">
                   {sector.lat.toFixed(4)}, {sector.lon.toFixed(4)}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1 text-sm">
-                    <Clock className="w-3 h-3" />
-                    {sector.tw_start} ~ {sector.tw_end}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge 
-                    variant="secondary"
-                    className={
-                      sector.priority === 1 ? 'bg-red-100 text-red-800' :
-                      sector.priority === 2 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }
-                  >
-                    {sector.priority === 1 ? '높음' : sector.priority === 2 ? '보통' : '낮음'}
-                  </Badge>
-                </TableCell>
+                {/* 시간창/우선순위 표시는 요구사항에 따라 제거 */}
                 <TableCell>
                   <div className="flex gap-2">
                     <Button

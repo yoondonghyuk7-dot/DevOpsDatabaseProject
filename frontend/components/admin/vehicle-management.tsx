@@ -117,44 +117,7 @@ export default function VehicleManagement() {
                 />
               </div>
               
-              <div>
-                <Label>연료 타입</Label>
-                <Select
-                  value={formData.fuel}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, fuel: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="연료 타입 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fuelTypes.map((fuel) => (
-                      <SelectItem key={fuel.value} value={fuel.value}>
-                        {fuel.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="emission-factor">배출계수 (g/km)</Label>
-                <Input
-                  id="emission-factor"
-                  type="number"
-                  value={formData.ef_gpkm}
-                  onChange={(e) => setFormData(prev => ({ ...prev, ef_gpkm: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="idle-emission">공회전 배출량 (g/s)</Label>
-                <Input
-                  id="idle-emission"
-                  type="number"
-                  value={formData.idle_gps}
-                  onChange={(e) => setFormData(prev => ({ ...prev, idle_gps: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
+              {/* 연료/배출 관련 필드는 요구사항에 따라 숨김 처리 */}
               
               <Button onClick={handleSubmit} className="w-full">
                 {editingVehicle ? '수정' : '등록'}
@@ -171,9 +134,7 @@ export default function VehicleManagement() {
               <TableHead>차량 ID</TableHead>
               <TableHead>타입</TableHead>
               <TableHead>적재용량</TableHead>
-              <TableHead>연료</TableHead>
-              <TableHead>배출계수</TableHead>
-              <TableHead>공회전</TableHead>
+              {/* 연료/배출 관련 컬럼 제거 */}
               <TableHead>작업</TableHead>
             </TableRow>
           </TableHeader>
@@ -185,20 +146,7 @@ export default function VehicleManagement() {
                 </TableCell>
                 <TableCell>{vehicle.type}</TableCell>
                 <TableCell>{vehicle.capacity_kg}kg</TableCell>
-                <TableCell>
-                  <Badge 
-                    variant="secondary"
-                    className={
-                      vehicle.fuel === 'EV' ? 'bg-green-100 text-green-800' :
-                      vehicle.fuel === 'HYBRID' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }
-                  >
-                    {fuelTypes.find(f => f.value === vehicle.fuel)?.label || vehicle.fuel}
-                  </Badge>
-                </TableCell>
-                <TableCell>{vehicle.ef_gpkm}g/km</TableCell>
-                <TableCell>{vehicle.idle_gps}g/s</TableCell>
+                {/* 연료/배출 관련 데이터 표시는 요구사항에 따라 제거 */}
                 <TableCell>
                   <div className="flex gap-2">
                     <Button
