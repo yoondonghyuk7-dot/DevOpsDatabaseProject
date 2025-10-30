@@ -166,9 +166,10 @@ def save_plan_and_analyze():
                 "latitude": job.get('lat'),
                 "longitude": job.get('lon'),
                 "demand_kg": job.get('demand_kg'),
-                "tw_start_str": job.get('tw_start', '09:00'),
-                "tw_end_str": job.get('tw_end', '17:00'),
-                "priority": job.get('priority', 2),
+            "tw_start_str": job.get('tw_start', '09:00'),
+            "tw_end_str": job.get('tw_end', '17:00'),
+            # 우선순위 미사용
+            "priority": None,
                 "run_date_str": run_date_str
             }
             # 👇 db_handler.py에 구현되어 있어야 합니다.
@@ -434,7 +435,8 @@ def create_vehicle():
     conn = None
     try:
         data = request.json
-        if not data or not all(k in data for k in ['id', 'type', 'capacity_kg', 'fuel', 'ef_gpkm', 'idle_gps']):
+        # 요구사항 반영: 프론트는 id, type, capacity_kg 만 전송
+        if not data or not all(k in data for k in ['id', 'type', 'capacity_kg']):
             return jsonify({"error": "필수 필드가 누락되었습니다."}), 400
         
         conn = get_db_connection()
@@ -446,17 +448,18 @@ def create_vehicle():
             WHERE LOWER(VEHICLE_TYPE) = LOWER(:vtype) 
             AND LOWER(FUEL_TYPE) = LOWER(:fuel)
             FETCH FIRST 1 ROWS ONLY
-        """, {"vtype": data['type'], "fuel": data['fuel']})
+        """, {"vtype": data.get('type', 'TRACTOR_25T'), "fuel": data.get('fuel', 'DIESEL')})
         
         factor_row = cursor.fetchone()
         if factor_row:
             factor_id = factor_row[0]
-            # 기존 배출계수 업데이트
-            cursor.execute("""
-                UPDATE EMISSION_FACTORS 
-                SET CO2_GPKM = :ef_gpkm, IDLE_GPS = :idle_gps
-                WHERE FACTOR_ID = :factor_id
-            """, {"ef_gpkm": data['ef_gpkm'], "idle_gps": data['idle_gps'], "factor_id": factor_id})
+            # 프론트에서 배출 인자를 보내지 않는 경우 기존값 유지
+            if 'ef_gpkm' in data or 'idle_gps' in data:
+                cursor.execute("""
+                    UPDATE EMISSION_FACTORS 
+                    SET CO2_GPKM = COALESCE(:ef_gpkm, CO2_GPKM), IDLE_GPS = COALESCE(:idle_gps, IDLE_GPS)
+                    WHERE FACTOR_ID = :factor_id
+                """, {"ef_gpkm": data.get('ef_gpkm'), "idle_gps": data.get('idle_gps'), "factor_id": factor_id})
         else:
             # 새로운 배출계수 생성
             factor_id_var = cursor.var(oracledb.NUMBER)
@@ -464,8 +467,8 @@ def create_vehicle():
                 INSERT INTO EMISSION_FACTORS (FACTOR_ID, VEHICLE_TYPE, FUEL_TYPE, CO2_GPKM, IDLE_GPS)
                 VALUES (EMISSION_FACTORS_SEQ.NEXTVAL, :vtype, :fuel, :ef_gpkm, :idle_gps)
                 RETURNING FACTOR_ID INTO :factor_id
-            """, {"vtype": data['type'], "fuel": data['fuel'], 
-                  "ef_gpkm": data['ef_gpkm'], "idle_gps": data['idle_gps'],
+            """, {"vtype": data.get('type', 'TRACTOR_25T'), "fuel": data.get('fuel', 'DIESEL'), 
+                  "ef_gpkm": data.get('ef_gpkm', 0), "idle_gps": data.get('idle_gps', 0),
                   "factor_id": factor_id_var})
             factor_id = factor_id_var.getvalue()[0]
         
@@ -654,17 +657,14 @@ def create_sector():
                 INSERT INTO SECTORS (SECTOR_ID, SECTOR_NAME, LATITUDE, LONGITUDE, 
                                    TW_START, TW_END, PRIORITY)
                 VALUES (:id, :name, :lat, :lon,
-                        TO_TIMESTAMP('2000-01-01 ' || :tw_start, 'YYYY-MM-DD HH24:MI'),
-                        TO_TIMESTAMP('2000-01-01 ' || :tw_end, 'YYYY-MM-DD HH24:MI'),
-                        :priority)
+                        NULL,
+                        NULL,
+                        NULL)
             """, {
                 "id": data['id'],
                 "name": data['name'],
                 "lat": data['lat'],
-                "lon": data['lon'],
-                "tw_start": data.get('tw_start', '09:00'),
-                "tw_end": data.get('tw_end', '17:00'),
-                "priority": data.get('priority', 2)
+                "lon": data['lon']
             })
         except:
             # SECTORS 테이블이 없으면 JOBS에 더미 작업 삽입 (임시 방법)
@@ -715,9 +715,10 @@ def update_sector(sector_id):
                 "name": data.get('name'),
                 "lat": data.get('lat'),
                 "lon": data.get('lon'),
-                "tw_start": data.get('tw_start'),
-                "tw_end": data.get('tw_end'),
-                "priority": data.get('priority'),
+            "tw_start": data.get('tw_start'),
+            "tw_end": data.get('tw_end'),
+            # 우선순위 값은 더 이상 사용하지 않음
+            "priority": None,
                 "sector_id": sector_id
             })
         except:
@@ -833,7 +834,8 @@ def create_job():
     conn = None
     try:
         data = request.json
-        if not data or not all(k in data for k in ['sector_id', 'date', 'demand_kg']):
+        # 요구사항 반영: 출발/도착 섹터를 받을 수 있도록 허용
+        if not data or not all(k in data for k in ['date', 'demand_kg']):
             return jsonify({"error": "필수 필드가 누락되었습니다."}), 400
         
         conn = get_db_connection()
@@ -858,15 +860,17 @@ def create_job():
             RETURNING JOB_ID INTO :job_id
         """, {
             "run_id": run_id,
-            "sector_id": data['sector_id'],
-            "address": data.get('address', data['sector_id']),
+            # 도착 섹터가 있으면 우선 사용, 없으면 기존 sector_id 사용
+            "sector_id": data.get('to_sector_id') or data.get('sector_id'),
+            "address": data.get('address', (data.get('to_sector_id') or data.get('sector_id'))),
             "lat": data.get('lat', 0),
             "lon": data.get('lon', 0),
             "demand_kg": data['demand_kg'],
             "date": data['date'],
             "tw_start": data.get('tw_start', '09:00'),
             "tw_end": data.get('tw_end', '17:00'),
-            "priority": data.get('priority', 2),
+            # 우선순위 미사용: NULL 저장
+            "priority": None,
             "job_id": cursor.var(oracledb.NUMBER)
         })
         
