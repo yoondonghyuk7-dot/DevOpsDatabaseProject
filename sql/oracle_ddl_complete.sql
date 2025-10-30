@@ -93,9 +93,8 @@ CREATE TABLE JOBS (
     LATITUDE     NUMBER(10,6),
     LONGITUDE    NUMBER(10,6),
     DEMAND_KG    NUMBER(10,2),
-    TW_START     TIMESTAMP,              -- 프론트엔드용: 시간창 시작
-    TW_END       TIMESTAMP,              -- 프론트엔드용: 시간창 종료
-    PRIORITY     NUMBER(1) DEFAULT 2,    -- 프론트엔드용: 우선순위 (1:높음, 2:보통, 3:낮음)
+    TW_START     TIMESTAMP,              -- 시간창 시작
+    TW_END       TIMESTAMP,              -- 시간창 종료
     CONSTRAINT FK_JOBS_RUN FOREIGN KEY (RUN_ID) REFERENCES RUNS (RUN_ID),
     CONSTRAINT FK_JOBS_SECTOR FOREIGN KEY (SECTOR_ID) REFERENCES SECTORS (SECTOR_ID)
 );
