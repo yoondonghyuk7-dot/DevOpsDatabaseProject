@@ -10,7 +10,11 @@ import { useStore } from '@/lib/store';
 import KakaoMapPlaceholder from '@/components/ui/kakao-map-placeholder';
 
 export default function RoutesPage() {
-  const { routes, kpis, vehicles } = useStore();
+  const { routes, kpis, vehicles, routeResults } = useStore();
+  
+  // 카카오 경로 확인
+  const hasKakaoRoute = routeResults.some((r: any) => r.route_name === "Kakao Recommended Route");
+  const ecoRoute = routeResults.find((r: any) => r.route_name === "Our Eco Optimal Route");
 
   const kpiCards = [
     {
@@ -160,6 +164,83 @@ export default function RoutesPage() {
               </Accordion>
             </CardContent>
           </Card>
+
+          {/* Route Comparison */}
+          {routeResults.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <Route className="w-5 h-5" />
+                  경로 비교
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Eco Route */}
+                {ecoRoute && (
+                  <div className="border rounded-lg p-4 bg-green-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-green-900">{ecoRoute.route_name}</h4>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        친환경 추천
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">거리: </span>
+                        <span className="font-medium">{ecoRoute.kpis.total_distance_km}km</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">CO₂: </span>
+                        <span className="font-medium">{ecoRoute.kpis.total_co2_kg}kg</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">시간: </span>
+                        <span className="font-medium">{Math.floor(ecoRoute.kpis.total_time_min / 60)}h {ecoRoute.kpis.total_time_min % 60}m</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Kakao Route */}
+                {hasKakaoRoute ? (
+                  routeResults
+                    .filter((r: any) => r.route_name === "Kakao Recommended Route")
+                    .map((kakaoRoute: any, idx: number) => (
+                      <div key={idx} className="border rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-blue-900">{kakaoRoute.route_name}</h4>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            카카오 추천
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">거리: </span>
+                            <span className="font-medium">{kakaoRoute.kpis.total_distance_km}km</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">CO₂: </span>
+                            <span className="font-medium">{kakaoRoute.kpis.total_co2_kg}kg</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">시간: </span>
+                            <span className="font-medium">{Math.floor(kakaoRoute.kpis.total_time_min / 60)}h {kakaoRoute.kpis.total_time_min % 60}m</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <div className="border rounded-lg p-4 bg-amber-50">
+                    <div className="flex items-center gap-2 text-amber-900">
+                      <span className="text-sm">
+                        ⚠️ Kakao는 다중 방문(VRP) 경로를 지원하지 않습니다.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* LLM Explanation */}
           <Card>

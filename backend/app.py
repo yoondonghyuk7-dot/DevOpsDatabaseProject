@@ -346,6 +346,134 @@ def get_results(run_id):
             except Exception as close_err:
                 print(f"DB 연결 종료 중 오류: {close_err}")
 
+
+# --- API: 경로 최적화 API (프론트엔드 호출용) ---
+@app.route('/api/optimize', methods=['POST'])
+def optimize():
+    """
+    최적화 요청을 받아 경로를 계산하고 결과를 반환합니다.
+    - 단일 작업(jobs가 1개): eco route + kakao route 2개 반환
+    - 다중 작업(jobs가 2개 이상): eco route만 1개 반환
+    """
+    if request.method == 'OPTIONS':
+        return jsonify(success=True)
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "요청 데이터가 필요합니다."}), 400
+        
+        jobs = data.get('jobs', [])
+        if not jobs:
+            return jsonify({"error": "작업(jobs)이 필요합니다."}), 400
+        
+        job_count = len(jobs)
+        
+        # 기존 최적화 로직 실행 (save-plan-and-analyze 참고)
+        # 임시로 run_id 생성
+        run_id = f"RUN_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        
+        # 최적화 실행
+        settings_rows = get_settings_from_db()
+        settings = {k: float(v) if v is not None else 0.0 for k, v in settings_rows}
+        
+        # vehicles와 depot 기본값
+        vehicles = data.get('vehicles', []) or [{"id": "VEHICLE_1", "type": "GENERIC"}]
+        depot_lat = data.get('depot_lat', 35.940000)
+        depot_lon = data.get('depot_lon', 126.680000)
+        
+        # jobs를 optimizer 형식으로 변환
+        jobs_for_optimizer = []
+        for job in jobs:
+            jobs_for_optimizer.append({
+                "job_id": job.get('sector_id') or f"JOB_{len(jobs_for_optimizer)}",
+                "latitude": job.get('lat', 0),
+                "longitude": job.get('lon', 0),
+                "demand_kg": job.get('demand_kg', 0),
+            })
+        
+        # 최적화 실행
+        opt_result = optimize_plan(
+            run_id=run_id,
+            run_date=data.get('run_date', datetime.now().strftime('%Y-%m-%d')),
+            vehicles=vehicles,
+            jobs=jobs_for_optimizer,
+            settings=settings,
+            depot=(depot_lat, depot_lon)
+        )
+        
+        # Eco route 생성
+        eco_routes = group_assignments_by_vehicle(opt_result.get('assignments', []))
+        summary = opt_result.get('summary', {})
+        
+        # 결과 배열 생성
+        results = []
+        
+        # Eco route 추가
+        eco_route_result = {
+            "route_name": "Our Eco Optimal Route",
+            "routes": eco_routes,
+            "kpis": {
+                "total_distance_km": summary.get('total_distance_km', 0) or 0,
+                "total_co2_kg": (summary.get('total_co2_g', 0) or 0) / 1000.0,
+                "total_time_min": summary.get('total_time_min', 0) or 0,
+                "saving_percent": summary.get('saving_pct', 0) or 0
+            }
+        }
+        results.append(eco_route_result)
+        
+        # 단일 작업일 때만 Kakao route 추가
+        if job_count == 1:
+            # Kakao route는 더미 데이터로 생성 (실제로는 카카오 API 호출 필요)
+            job = jobs[0]
+            kakao_route_result = {
+                "route_name": "Kakao Recommended Route",
+                "routes": [{
+                    "vehicle_id": vehicles[0].get('id', 'VEHICLE_1'),
+                    "steps": [{
+                        "sector_id": job.get('sector_id', 'UNKNOWN'),
+                        "arrival_time": "09:00",
+                        "departure_time": "10:00",
+                        "distance_km": 5.0,  # 더미 값
+                        "co2_kg": 0.5  # 더미 값
+                    }],
+                    "total_distance_km": 5.0,
+                    "total_co2_kg": 0.5,
+                    "total_time_min": 60,
+                    "polyline": []
+                }],
+                "kpis": {
+                    "total_distance_km": 5.0,
+                    "total_co2_kg": 0.5,
+                    "total_time_min": 60,
+                    "saving_percent": 0
+                }
+            }
+            results.append(kakao_route_result)
+        
+        # 전체 KPI 계산 (eco route 기준)
+        total_kpis = eco_route_result["kpis"]
+        
+        # run_history_entry 생성
+        run_history_entry = {
+            "run_id": run_id,
+            "date": data.get('run_date', datetime.now().strftime('%Y-%m-%d')),
+            "total_distance": total_kpis["total_distance_km"],
+            "total_co2": total_kpis["total_co2_kg"],
+            "served_jobs": job_count
+        }
+        
+        return jsonify({
+            "routes": results,
+            "kpis": total_kpis,
+            "run_history_entry": run_history_entry
+        }), 200
+        
+    except Exception as e:
+        print(f"최적화 중 오류: {e}")
+        return jsonify({"error": "최적화 중 오류 발생", "details": str(e)}), 500
+
+
 def group_assignments_by_vehicle(assignments_data: list) -> list:
     """
     DB에서 조회된 assignments 딕셔너리 리스트를

@@ -22,6 +22,12 @@ interface AppStore {
 
   runHistory: RunHistory[];
 
+  routeResults: Array<{
+    route_name: string;
+    routes: Route[];
+    kpis: KPIs;
+  }>;
+
   chartData: ChartData;
 
 
@@ -98,6 +104,8 @@ export const useStore = create<AppStore>((set, get) => ({
 
   kpis: mockKPIs,
 
+  routeResults: [],
+
   runHistory: mockRunHistory,
 
   chartData: mockChartData,
@@ -161,12 +169,18 @@ export const useStore = create<AppStore>((set, get) => ({
       // 2. 여기가 app.py가 돌려준 진짜 JSON 결과를 파싱(분해)하는 부분입니다.
       // --------------------------------------------------------
       const result = await response.json(); // ⬅️ (3) 백엔드가 준 JSON 결과를 받음
-      const { routes, kpis, run_history_entry } = result; // ⬅️ (4) JSON 분해
+      const { routes: routeResults, kpis, run_history_entry } = result; // ⬅️ (4) JSON 분해 (routes는 이제 results 배열)
+
+      // Eco route를 기본 routes로 설정
+      const ecoRoute = routeResults.find((r: any) => r.route_name === "Our Eco Optimal Route");
+      const defaultRoutes = ecoRoute?.routes || [];
+      const defaultKpis = ecoRoute?.kpis || kpis;
 
       // 3. 받은 "진짜" 데이터로 화면을 업데이트합니다. (표현하기)
       set({ 
-        routes: routes,     // ⬅️ (5) 진짜 경로
-        kpis: kpis,         // ⬅️ (6) 진짜 지표
+        routes: defaultRoutes,     // ⬅️ (5) Eco route를 기본 경로로 사용
+        kpis: defaultKpis,         // ⬅️ (6) Eco route KPI를 기본 지표로 사용
+        routeResults: routeResults || [], // ⬅️ 모든 경로 결과 저장 (eco + kakao)
         isOptimizing: false,
         runHistory: [run_history_entry, ...get().runHistory] // ⬅️ (7) 진짜 실행 이력
       });
